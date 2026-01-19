@@ -39,6 +39,7 @@ A lightweight vanilla WoW addon for checking raid members' Arcane Resistance for
 4. Results display in a window showing:
    - **Green names**: Players with 200+ AR (ready for Anomalus)
    - **Red names**: Players below 200 AR (need more resistance gear)
+   - **Yellow names**: Players who do not have the addon (or did not report back for some reason)
    - Summary count at the top
 
 ### Notes:
