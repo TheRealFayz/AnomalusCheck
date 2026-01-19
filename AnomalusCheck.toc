@@ -1,0 +1,8 @@
+## Interface: 11200
+## Title: AnomalusCheck
+## Notes: Checks raid members for 200+ Arcane Resistance
+## Author: Fayz
+## Version: 1.0
+## SavedVariables: AnomalusCheckDB
+
+AnomalusCheck.lua
