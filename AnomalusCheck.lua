@@ -5,6 +5,7 @@
 local ADDON_PREFIX = "AnomalusCheck"
 local ARCANE_RESIST_THRESHOLD = 200
 local resistData = {}
+local allRaidMembers = {}
 local checkInProgress = false
 
 -- Create the main frame
@@ -115,7 +116,27 @@ function AnomalusCheck_PerformCheck()
     end
     
     resistData = {}
+    allRaidMembers = {}
     checkInProgress = true
+    
+    -- Record all raid members at the start
+    if GetNumRaidMembers() > 0 then
+        for i = 1, GetNumRaidMembers() do
+            local name = UnitName("raid"..i)
+            if name then
+                allRaidMembers[name] = true
+            end
+        end
+    else
+        -- Party
+        allRaidMembers[UnitName("player")] = true
+        for i = 1, GetNumPartyMembers() do
+            local name = UnitName("party"..i)
+            if name then
+                allRaidMembers[name] = true
+            end
+        end
+    end
     
     -- Add my own data first
     local myAR = GetPlayerArcaneResist()
@@ -148,31 +169,67 @@ function AnomalusCheck_UpdateDisplay()
     local output = ""
     local passCount = 0
     local failCount = 0
+    local noAddonCount = 0
     local totalCount = 0
     
-    -- Sort by arcane resist (highest first)
+    -- Sort by arcane resist (highest first), then alphabetically for no-addon players
     local sortedNames = {}
+    
+    -- Add players who responded
     for name, ar in pairs(resistData) do
-        table.insert(sortedNames, {name = name, ar = ar})
+        table.insert(sortedNames, {name = name, ar = ar, hasAddon = true})
     end
-    table.sort(sortedNames, function(a, b) return a.ar > b.ar end)
+    
+    -- Add players who didn't respond
+    for name, _ in pairs(allRaidMembers) do
+        if not resistData[name] then
+            table.insert(sortedNames, {name = name, ar = -1, hasAddon = false})
+        end
+    end
+    
+    -- Sort: addon users by AR descending, then non-addon users alphabetically
+    table.sort(sortedNames, function(a, b)
+        if a.hasAddon and not b.hasAddon then
+            return true
+        elseif not a.hasAddon and b.hasAddon then
+            return false
+        elseif a.hasAddon and b.hasAddon then
+            return a.ar > b.ar
+        else
+            return a.name < b.name
+        end
+    end)
     
     -- Build output with better spacing
     for _, data in ipairs(sortedNames) do
         totalCount = totalCount + 1
         local colorCode
-        if data.ar >= ARCANE_RESIST_THRESHOLD then
+        local displayText
+        
+        if not data.hasAddon then
+            colorCode = "|cFFFFFF00" -- Yellow
+            displayText = data.name .. ": No addon"
+            noAddonCount = noAddonCount + 1
+        elseif data.ar >= ARCANE_RESIST_THRESHOLD then
             colorCode = "|cFF00FF00" -- Green
+            displayText = data.name .. ": " .. data.ar .. " AR"
             passCount = passCount + 1
         else
             colorCode = "|cFFFF0000" -- Red
+            displayText = data.name .. ": " .. data.ar .. " AR"
             failCount = failCount + 1
         end
-        output = output .. colorCode .. data.name .. ": " .. data.ar .. " AR|r\n\n"
+        
+        output = output .. colorCode .. displayText .. "|r\n\n"
     end
     
     -- Add summary at top with better formatting
-    local summary = string.format("|cFFFFFF00Summary:|r %d/%d meet 200+ AR\n\n", passCount, totalCount)
+    local summary = string.format("|cFFFFFF00Summary:|r %d/%d meet 200+ AR", passCount, totalCount)
+    if noAddonCount > 0 then
+        summary = summary .. string.format("\n|cFFFFFF00%d without addon|r", noAddonCount)
+    end
+    summary = summary .. "\n\n"
+    
     resultsText:SetText(summary .. output)
     
     -- Adjust scroll child height
